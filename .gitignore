@@ -1,0 +1,32 @@
+# === CLion project files ===
+.idea/
+cmake-build-*/
+
+# === CMake files ===
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# === Build artifacts ===
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
+*.out
+
+# === Backup / temp files ===
+*~
+*.swp
+*.tmp
+*.log
+
+# === User-specific settings ===
+*.iml
+
+# === OS-generated files ===
+.DS_Store
+Thumbs.db
