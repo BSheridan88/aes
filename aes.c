@@ -5,15 +5,15 @@
 #include <unistd.h>
 
 
-FILE *file;
+FILE *input,*output;
 DIR *dir;
 int round;
-
+char txt_data[300];
+char dir_name[100];
 
 int search_file() {
     char final_path[100];
     char file_name[30];
-    char dir_name[100];
     size_t bytes_read;
 
     getcwd(dir_name, sizeof(dir_name));
@@ -24,24 +24,25 @@ int search_file() {
 
     snprintf(final_path,sizeof(final_path),"%s/%s",dir_name,file_name);
 
-    file = fopen(final_path,"r");
-    char txt_data[300];
-    bytes_read = fread(txt_data, 1, sizeof(txt_data) - 1, file);
+    input = fopen(final_path,"r");
+
+    bytes_read = fread(txt_data, 1, sizeof(txt_data) - 1, input);
     txt_data[bytes_read] = '\0';
 
-    if (file == NULL) {
+    if (input == NULL) {
         printf("File not found\n");
         return 1;
     }
 
     if (bytes_read == 0) {
-        if (feof(file)) {
+        if (feof(input)) {
             printf("Finished reading file \n");
         }else {
             printf("Failed to read file \n");
         }
     }
     printf("%s\n",txt_data);
+    fclose(input);
 }
 void xor(char *msg, char *key){
     size_t key_index = 0;
@@ -54,15 +55,28 @@ void xor(char *msg, char *key){
 }
 
 int main(void) {
-   search_file();
-  // file = fopen("",'r');
+    char output_file[30];
+    char output_path[300];
+    search_file();
+    char key[100];
+    printf("What is the key you would like to use: \n");
+    fgets(key,sizeof(key),stdin);
+    key[strcspn(key, "\n")] = 0;
+
+    printf("*** make it a .enc *** \n");
+    printf("What is the name of the exported file: \n");
+    fgets(output_file,sizeof(output_file),stdin);
+    output_file[strcspn(output_file, "\n")] = 0;
+    sprintf(output_path,"%s/%s",dir_name,output_file);
+
+    output = fopen(output_path,"w");
 
     for (round = 1; round < 14; round++) {
-       // xor();
+        xor(txt_data,key);
         //add other steps
     }
     if (round == 14) {
-        //xor();
+        xor(txt_data,key);
         //add other steps
         //don't mix colums here
     }
@@ -71,7 +85,7 @@ int main(void) {
     all the aes math logic
     */
     //fwrite();
-    fflush(file);
+
 
     return 0;
 }
