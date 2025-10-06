@@ -4,13 +4,12 @@
 #include <dirent.h>
 #include <unistd.h>
 
-
 FILE *input,*output;
 DIR *dir;
-int round;
-char txt_data[300];
-char dir_name[100];
 size_t file_size;
+int round;
+unsigned char txt_data[300];
+char dir_name[100];
 unsigned char sbox[256] {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -44,7 +43,6 @@ int search_file() {
 
     input = fopen(final_path,"r");
 
-
     bytes_read = fread(txt_data, 1, sizeof(txt_data) - 1, input);
     txt_data[bytes_read] = '\0';
     file_size = bytes_read;
@@ -67,18 +65,28 @@ int search_file() {
 }
 void xor(char *msg, const char *key,size_t msg_len){
     size_t key_index = 0;
- //   size_t msg_len = strlen((char*) msg);
     size_t key_len = strlen((char*) key);
     for (int i = 0; i <msg_len;i++ ) {
         msg[i] ^= key[key_index % key_len];
         key_index++;
     }
 }
+unsigned char gf_multiply(unsigned char a, unsigned char b) {
+
+    for (int i = 0; i < 7; i++) {
+        if (b & (1 << i)) { //if i place bit is on in b
+
+        }
+       //if(something with a and its bits)
+        //have something about like if 7 bit slot is checked cause then u need to do the overflow thingy
+        //where x^8 = x^4 + x^3 + x + 1
+    }
+}
 
 int main(void) {
     char output_file[30];
     char output_path[300];
-    char key[100];
+    unsigned char key[100];
 
     search_file();
 
@@ -96,6 +104,7 @@ int main(void) {
 
     for (round = 1; round < 14; round++) {
         xor(txt_data,key,file_size);
+        //
         //add other steps
     }
     if (round == 14) {
