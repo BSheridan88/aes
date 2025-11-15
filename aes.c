@@ -82,13 +82,64 @@ unsigned char gf_multiply(unsigned char a, unsigned char b) {
 
         high_bit_set = temp_a & 0x80; //checks if high bit is a 1
         temp_a = temp_a << 1;
+
         if (high_bit_set != 0) {
             temp_a = temp_a ^ 0x1B;
         }
     }
     return result & 0xFF; //makes sure it stays within GF field
 }
+void sbox_swap(unsigned char *state ,size_t length) {
+    for (int i = 0; i < length; i++) {
+        state[i] = sbox[state[i]];
+    }
+}
+void shift_row(unsigned char *state,size_t length) {
+    int row = 1;
+    int column = 0;
+    int shift = 1;
+    unsigned char grid[4][4];
 
+    //should i add a for loop for more than 1 block since there is more than 16 hex
+
+    for (int i = 0; i < 16; i++) { //copy state to grid
+        grid[i/4][i%4] = state[i];
+    }
+
+    for (row = 1;row < 4;row++) {
+        for (column = 0;column < 4;column++) {
+            unsigned char temp = grid[row][column];
+            grid[row][column] = grid[row][(column-shift + 4) % 4];
+             grid[row][] = temp; //find a way to wrap around
+            //finish the temp logic and do it cause it is not right at the moment
+            //what if i keep shifting all by 1 value so in 2 when it shifts twice it goes
+            /*
+             1 2 3 4
+             2 3 4 1    find way to carry one
+             3 4 1 2    find way to carry two
+             ex. for the 2 row shift above
+             then to do this you multiple the times it shifts by 1 by the row it is in
+             ie: row 1 does the 1 shift x 1
+                 row 2 does the 1 shift x 2
+                 row 3 does the 1 shift x 3
+            */
+        }
+        shift++;
+    }
+
+    for (int i = 0; i < 16; i++) { //copy grid to state post swap
+        state[i] = grid[i/4][i%4];
+    }
+}
+void mix_column(unsigned char *state,size_t length) {
+    //use the gf_multiply(); in here somehow
+    unsigned char temp_column[];
+    for (int column = 0; column < 4; column++) {
+        state[column] = temp_column;
+        temp_column[0] = gf_multiply( ,state[0]);
+
+    }
+}
 int main(void) {
     char output_file[30];
     char output_path[300];
@@ -110,24 +161,25 @@ int main(void) {
 
     for (round = 1; round < 14; round++) {
         xor(txt_data,key,file_size);
-        //
+        sbox_swap(txt_data,file_size);
+        shift_row(txt_data,file_size);
+        mix_column(txt_data,file_size);
+
         //add other steps
     }
     if (round == 14) {
         xor(txt_data,key,file_size);
+        sbox_swap(txt_data,file_size);
+        shift_row(txt_data,file_size);
         //add other steps
         //don't mix colums here
     }
    // xor(txt_data,key,file_size);
     //use this when printing to file
     for (size_t i = 0; i < file_size; i++) {
-        printf("%02x ", (unsigned char)txt_data[i]);
+        printf("%02x ", txt_data[i]);
     }
     printf("\n");
-    /*
-     14 rounds so a loop
-    all the aes math logic
-    */
 
 fclose(output);
 
