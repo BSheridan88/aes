@@ -3,6 +3,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <sodium.h>
 
 FILE *input,*output;
 DIR *dir;
@@ -10,6 +11,8 @@ size_t file_size;
 int round;
 unsigned char txt_data[300];
 char dir_name[100];
+unsigned char key[100];
+unsigned char final_key[40];
 unsigned char sbox[256] {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -63,7 +66,7 @@ int search_file() {
     fclose(input);
     return 0;
 }
-void xor(char *msg, const char *key,size_t msg_len){
+void xor(char *msg,char *key, size_t msg_len){
     size_t key_index = 0;
     size_t key_len = strlen((char*) key);
     for (int i = 0; i <msg_len;i++ ) {
@@ -89,61 +92,115 @@ unsigned char gf_multiply(unsigned char a, unsigned char b) {
     }
     return result & 0xFF; //makes sure it stays within GF field
 }
-void sbox_swap(unsigned char *state ,size_t length) {
+void sbox_swap(size_t length) {
     for (int i = 0; i < length; i++) {
-        state[i] = sbox[state[i]];
+        txt_data[i] = sbox[txt_data[i]];
     }
 }
-void shift_row(unsigned char *state,size_t length) {
+void shift_row(size_t length) {
     int row = 1;
     int column = 0;
-    int shift = 1;
     unsigned char grid[4][4];
 
-    //should i add a for loop for more than 1 block since there is more than 16 hex
-
-    for (int i = 0; i < 16; i++) { //copy state to grid
-        grid[i/4][i%4] = state[i];
+    for (int i = 0; i < 16; i++) {
+        grid[i/4][i%4] = txt_data[i];
     }
 
     for (row = 1;row < 4;row++) {
+        unsigned char temp[4];
+
         for (column = 0;column < 4;column++) {
-            unsigned char temp = grid[row][column];
-            grid[row][column] = grid[row][(column-shift + 4) % 4];
-             grid[row][] = temp; //find a way to wrap around
-            //finish the temp logic and do it cause it is not right at the moment
-            //what if i keep shifting all by 1 value so in 2 when it shifts twice it goes
-            /*
-             1 2 3 4
-             2 3 4 1    find way to carry one
-             3 4 1 2    find way to carry two
-             ex. for the 2 row shift above
-             then to do this you multiple the times it shifts by 1 by the row it is in
-             ie: row 1 does the 1 shift x 1
-                 row 2 does the 1 shift x 2
-                 row 3 does the 1 shift x 3
-            */
+            temp[column] = grid[row][(column + row) % 4];
         }
-        shift++;
+
+        for (int col = 0; col < 4; col++) {
+                grid[row][col] = temp[col];
+        }
     }
 
-    for (int i = 0; i < 16; i++) { //copy grid to state post swap
-        state[i] = grid[i/4][i%4];
+    for (int i = 0; i < 16; i++) {
+        txt_data[i] = grid[i/4][i%4];
     }
 }
 void mix_column(unsigned char *state,size_t length) {
-    //use the gf_multiply(); in here somehow
     unsigned char temp_column[];
+    unsigned char new_column[];
+    //copy state in its specific column array to temp
     for (int column = 0; column < 4; column++) {
-        state[column] = temp_column;
-        temp_column[0] = gf_multiply( ,state[0]);
-
+        //have shifting logic work for rows for stuff below mostly in the copying part of logic
+        // 2 3 1 1
+        // 1 2 3 1
+        // 1 1 2 3
+        // 3 1 1 2
+        //fix this whole things formatting
+        new_column[0] =
+            gf_multiply(0x02 ,temp_column[0]);
+            xor(gf_multiply(0x03,temp_column[1]), ,length);
+            xor(temp_column[2], ,length);
+            xor(temp_column[3], ,length);
+        new_column[1] =
+           temp_column[0];
+           xor(gf_multiply(0x02,temp_column[1]), ,length);
+           xor(gf_multiply(0x03,temp_column[2]), ,length);
+           xor(temp_column[3], ,length);
+        new_column[2] =
+            temp_column[0];
+            xor(temp_column[1], ,length);
+            xor(gf_multiply(0x02,temp_column[2]), ,length);
+            xor(gf_multiply(0x03,temp_column[3]), ,length);
+        new_column[3] =
+            gf_multiply(0x03 ,temp_column[0]);
+            xor(temp_column[1], ,length);
+            xor(temp_column[2], ,length);
+            xor(gf_multiply(0x02,temp_column[3]), ,length);
+        //copy new column back to original state
+        state[] = new_column[];
     }
+}
+void key_derivation(size_t key_len) {
+    unsigned char salt[32];
+    size_t salt_size = 32 - key_len; //forces key to be 32 bytes
+    randombytes_buf(salt,salt_size);
+
+    memcpy(final_key,key, key_len);
+    memcpy(final_key+ key_len,salt,salt_size);
+}
+void add_key() {
+    unsigned char key_grid[4][4];
+    unsigned char txt_grid[4][4];
+    int row = 0;
+    int column = 0;
+
+    for (int i = 0; i < 16; i++) { //turn key into a 4x4 grid
+        key_grid[i/4][i%4] = key[i];
+    }
+
+    for (int i = 0; i < 16; i++) { //turn txt_data into a 4x4 grid
+        txt_grid[i/4][i%4] = txt_data[i];
+    }
+
+    for (row = 0;row < 4;row++) { //something in this double for loop is wrong cause of the  k1 rule
+        for (column = 0;column < 4;column++) {
+            xor(txt_grid[row][column],key_grid[row][column],sizeof(txt_grid));
+        }
+    }
+    //that is only first round tho
+    //or is it just done over and over and over again the needed times
+    /*
+     w0  w4  w8   w12
+     w1  w5  w9   w13
+     w2  w6  w10  w14
+     w3  w7  w11  w15
+     k1  k2  k3   k4   = 1st round
+    /*
+     xor txt_grid with key_grid
+     60 words needed to meet requirement
+     15 keys
+     */
 }
 int main(void) {
     char output_file[30];
     char output_path[300];
-    unsigned char key[100];
 
     search_file();
 
@@ -151,6 +208,8 @@ int main(void) {
     fgets(key,sizeof(key),stdin);
     key[strcspn(key, "\n")] = 0;
     printf("%s\n",key);
+    size_t key_len = strlen(key);
+
     printf("*** make it a .enc *** \n");
     printf("What is the name of the exported file: \n");
     fgets(output_file,sizeof(output_file),stdin);
@@ -159,27 +218,28 @@ int main(void) {
 
     output = fopen(output_path,"a");
 
+    key_derivation(key_len);
+    add_key();
+
     for (round = 1; round < 14; round++) {
         xor(txt_data,key,file_size);
-        sbox_swap(txt_data,file_size);
-        shift_row(txt_data,file_size);
+        sbox_swap(file_size);
+        shift_row(file_size);
         mix_column(txt_data,file_size);
-
-        //add other steps
+        add_key();
     }
+
     if (round == 14) {
         xor(txt_data,key,file_size);
-        sbox_swap(txt_data,file_size);
-        shift_row(txt_data,file_size);
-        //add other steps
-        //don't mix colums here
+        sbox_swap(file_size);
+        shift_row(file_size);
+        add_key();
     }
-   // xor(txt_data,key,file_size);
-    //use this when printing to file
-    for (size_t i = 0; i < file_size; i++) {
-        printf("%02x ", txt_data[i]);
+
+    for () {
+        
+        //add a way to print to file
     }
-    printf("\n");
 
 fclose(output);
 
