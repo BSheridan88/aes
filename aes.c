@@ -70,7 +70,7 @@ void xor(char *msg,char *key, size_t msg_len){
     size_t key_index = 0;
     size_t key_len = strlen((char*) key);
     for (int i = 0; i <msg_len;i++ ) {
-        msg[i] ^= key[key_index % key_len];
+        msg[i] ^= final_key[key_index % key_len];
         key_index++;
     }
 }
@@ -163,25 +163,37 @@ void key_derivation(size_t key_len) {
     randombytes_buf(salt,salt_size);
 
     memcpy(final_key,key, key_len);
-    memcpy(final_key+ key_len,salt,salt_size);
+    memcpy(final_key + key_len,salt,salt_size);
 }
 void add_key() {
     unsigned char key_grid[4][4];
     unsigned char txt_grid[4][4];
     int row = 0;
     int column = 0;
-
-    for (int i = 0; i < 16; i++) { //turn key into a 4x4 grid
-        key_grid[i/4][i%4] = key[i];
-    }
+    int round = 0;
 
     for (int i = 0; i < 16; i++) { //turn txt_data into a 4x4 grid
         txt_grid[i/4][i%4] = txt_data[i];
     }
 
-    for (row = 0;row < 4;row++) { //something in this double for loop is wrong cause of the  k1 rule
-        for (column = 0;column < 4;column++) {
-            xor(txt_grid[row][column],key_grid[row][column],sizeof(txt_grid));
+    for (round = 0; round < 15; round++) {
+        //fix this so that it works for each round by making sure it does the next 16 every time and not repeating the
+        //ones that it used in the last round or any round for that matter
+        //gonna be something with key like the full_extended_key[(round+1)*16]
+        //make sure on round 2 that it would be instead of 0-15 again it is 16-31
+        for (int i = 0; i < 16; i++) { //turn key into a 4x4 grid
+            key_grid[i/4][i%4] = final_key[i];
+            //make this expand properly not currently working
+        }
+
+        for (row = 0;row < 4;row++) { //something in this double for loop is wrong cause of the  k1 rule
+            for (column = 0;column < 4;column++) {
+                txt_grid[row][column] ^= key_grid[row][column];
+            }
+        }
+
+        for (int i = 0; i < 16;i++) {
+            txt_data[i] = txt_grid[i/4][i%4];
         }
     }
     //that is only first round tho
@@ -222,7 +234,7 @@ int main(void) {
     add_key();
 
     for (round = 1; round < 14; round++) {
-        xor(txt_data,key,file_size);
+        xor(txt_data,final_key,file_size);
         sbox_swap(file_size);
         shift_row(file_size);
         mix_column(txt_data,file_size);
@@ -230,14 +242,13 @@ int main(void) {
     }
 
     if (round == 14) {
-        xor(txt_data,key,file_size);
+        xor(txt_data,final_key,file_size);
         sbox_swap(file_size);
         shift_row(file_size);
         add_key();
     }
 
     for () {
-        
         //add a way to print to file
     }
 
