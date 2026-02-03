@@ -66,7 +66,7 @@ int search_file() {
     fclose(input);
     return 0;
 }
-void xor(char *msg,char *key, size_t msg_len){
+void xor(char *msg, size_t msg_len){
     size_t key_index = 0;
     size_t key_len = strlen((char*) key);
     for (int i = 0; i <msg_len;i++ ) {
@@ -97,7 +97,7 @@ void sbox_swap(size_t length) {
         txt_data[i] = sbox[txt_data[i]];
     }
 }
-void shift_row(size_t length) {
+void shift_row() {
     int row = 1;
     int column = 0;
     unsigned char grid[4][4];
@@ -125,6 +125,7 @@ void shift_row(size_t length) {
 void mix_column(unsigned char *state,size_t length) {
     unsigned char temp_column[];
     unsigned char new_column[];
+    //work on mix column
     //copy state in its specific column array to temp
     for (int column = 0; column < 4; column++) {
         //have shifting logic work for rows for stuff below mostly in the copying part of logic
@@ -135,24 +136,24 @@ void mix_column(unsigned char *state,size_t length) {
         //fix this whole things formatting
         new_column[0] =
             gf_multiply(0x02 ,temp_column[0]);
-            xor(gf_multiply(0x03,temp_column[1]), ,length);
-            xor(temp_column[2], ,length);
-            xor(temp_column[3], ,length);
+            xor(gf_multiply(0x03,temp_column[1]),length);
+            xor(temp_column[2],length);
+            xor(temp_column[3],length);
         new_column[1] =
            temp_column[0];
-           xor(gf_multiply(0x02,temp_column[1]), ,length);
-           xor(gf_multiply(0x03,temp_column[2]), ,length);
-           xor(temp_column[3], ,length);
+           xor(gf_multiply(0x02,temp_column[1]),length);
+           xor(gf_multiply(0x03,temp_column[2]),length);
+           xor(temp_column[3],length);
         new_column[2] =
             temp_column[0];
-            xor(temp_column[1], ,length);
-            xor(gf_multiply(0x02,temp_column[2]), ,length);
-            xor(gf_multiply(0x03,temp_column[3]), ,length);
+            xor(temp_column[1],length);
+            xor(gf_multiply(0x02,temp_column[2]),length);
+            xor(gf_multiply(0x03,temp_column[3]),length);
         new_column[3] =
             gf_multiply(0x03 ,temp_column[0]);
-            xor(temp_column[1], ,length);
-            xor(temp_column[2], ,length);
-            xor(gf_multiply(0x02,temp_column[3]), ,length);
+            xor(temp_column[1],length);
+            xor(temp_column[2],length);
+            xor(gf_multiply(0x02,temp_column[3]),length);
         //copy new column back to original state
         state[] = new_column[];
     }
@@ -166,49 +167,34 @@ void key_derivation(size_t key_len) {
     memcpy(final_key + key_len,salt,salt_size);
 }
 void add_key() {
-    unsigned char key_grid[4][4];
-    unsigned char txt_grid[4][4];
-    int row = 0;
-    int column = 0;
-    int round = 0;
+        unsigned char key_grid[4][4];
+        unsigned char txt_grid[4][4];
+        int row = 0;
+        int column = 0;
+        int round = 0;
 
-    for (int i = 0; i < 16; i++) { //turn txt_data into a 4x4 grid
-        txt_grid[i/4][i%4] = txt_data[i];
-    }
+        for (round = 0; round < 15; round++) {
+            for (int i = 0; i < 16; i++) {
+                txt_grid[i/4][i%4] = txt_data[i];
+            }
 
-    for (round = 0; round < 15; round++) {
-        //fix this so that it works for each round by making sure it does the next 16 every time and not repeating the
-        //ones that it used in the last round or any round for that matter
-        //gonna be something with key like the full_extended_key[(round+1)*16]
-        //make sure on round 2 that it would be instead of 0-15 again it is 16-31
-        for (int i = 0; i < 16; i++) { //turn key into a 4x4 grid
-            key_grid[i/4][i%4] = final_key[i];
-            //make this expand properly not currently working
-        }
+            // Load the correct round key
+            for (int i = 0; i < 16; i++) {
+                key_grid[i/4][i%4] = final_key[(round * 16) + i];
+            }
 
-        for (row = 0;row < 4;row++) { //something in this double for loop is wrong cause of the  k1 rule
-            for (column = 0;column < 4;column++) {
-                txt_grid[row][column] ^= key_grid[row][column];
+
+            for (row = 0; row < 4; row++) {
+                for (column = 0; column < 4; column++) {
+                    txt_grid[row][column] ^= key_grid[row][column];
+                }
+            }
+
+            // Write back to txt_data
+            for (int i = 0; i < 16; i++) {
+                txt_data[i] = txt_grid[i/4][i%4];
             }
         }
-
-        for (int i = 0; i < 16;i++) {
-            txt_data[i] = txt_grid[i/4][i%4];
-        }
-    }
-    //that is only first round tho
-    //or is it just done over and over and over again the needed times
-    /*
-     w0  w4  w8   w12
-     w1  w5  w9   w13
-     w2  w6  w10  w14
-     w3  w7  w11  w15
-     k1  k2  k3   k4   = 1st round
-    /*
-     xor txt_grid with key_grid
-     60 words needed to meet requirement
-     15 keys
-     */
 }
 int main(void) {
     char output_file[30];
@@ -228,31 +214,34 @@ int main(void) {
     output_file[strcspn(output_file, "\n")] = 0;
     sprintf(output_path,"%s/%s",dir_name,output_file);
 
-    output = fopen(output_path,"a");
+
 
     key_derivation(key_len);
     add_key();
 
     for (round = 1; round < 14; round++) {
-        xor(txt_data,final_key,file_size);
+        xor(txt_data,file_size);
         sbox_swap(file_size);
-        shift_row(file_size);
+        shift_row();
         mix_column(txt_data,file_size);
         add_key();
     }
 
     if (round == 14) {
-        xor(txt_data,final_key,file_size);
+        xor(txt_data,file_size);
         sbox_swap(file_size);
-        shift_row(file_size);
+        shift_row();
         add_key();
     }
 
-    for () {
-        //add a way to print to file
+    output = fopen(output_path,"a");
+
+    fwrite(txt_data,1,sizeof(txt_data)-1,output);
+    if (output == NULL) {
+        printf("Error opening output file\n");
     }
 
-fclose(output);
-
+    fclose(output);
+    printf("File successfully encrypted \n");
     return 0;
 }
