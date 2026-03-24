@@ -9,11 +9,12 @@ FILE *input,*output;
 DIR *dir;
 size_t file_size;
 int round;
+int round_reverse = 14;
 unsigned char txt_data[300];
 char dir_name[100];
 unsigned char key[100];
 unsigned char final_key[40];
-unsigned char sbox[256] {
+unsigned char sbox[256] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
     0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
@@ -62,7 +63,7 @@ int search_file() {
             printf("Failed to read file \n");
         }
     }
-    printf("%s\n",txt_data);
+    printf("%s\n",txt_data); //remove this is for check
     fclose(input);
     return 0;
 }
@@ -122,40 +123,40 @@ void shift_row() {
         txt_data[i] = grid[i/4][i%4];
     }
 }
-void mix_column(unsigned char *state,size_t length) {
-    unsigned char temp_column[];
-    unsigned char new_column[];
-    //work on mix column
-    //copy state in its specific column array to temp
+void mix_column(unsigned char *state) {
+    unsigned char temp_column[4];
+    unsigned char new_column[4];
+
+
     for (int column = 0; column < 4; column++) {
-        //have shifting logic work for rows for stuff below mostly in the copying part of logic
-        // 2 3 1 1
-        // 1 2 3 1
-        // 1 1 2 3
-        // 3 1 1 2
-        //fix this whole things formatting
-        new_column[0] =
-            gf_multiply(0x02 ,temp_column[0]);
-            xor(gf_multiply(0x03,temp_column[1]),length);
-            xor(temp_column[2],length);
-            xor(temp_column[3],length);
-        new_column[1] =
-           temp_column[0];
-           xor(gf_multiply(0x02,temp_column[1]),length);
-           xor(gf_multiply(0x03,temp_column[2]),length);
-           xor(temp_column[3],length);
-        new_column[2] =
-            temp_column[0];
-            xor(temp_column[1],length);
-            xor(gf_multiply(0x02,temp_column[2]),length);
-            xor(gf_multiply(0x03,temp_column[3]),length);
-        new_column[3] =
-            gf_multiply(0x03 ,temp_column[0]);
-            xor(temp_column[1],length);
-            xor(temp_column[2],length);
-            xor(gf_multiply(0x02,temp_column[3]),length);
-        //copy new column back to original state
-        state[] = new_column[];
+        for (int row = 0; row < 4; row++) {
+            temp_column[row] = state[row * 4 + column];
+        }
+
+        new_column[0] = gf_multiply(0x02, temp_column[0]) ^
+                        gf_multiply(0x03, temp_column[1]) ^
+                        temp_column[2] ^
+                        temp_column[3];
+
+        new_column[1] = temp_column[0] ^
+                        gf_multiply(0x02, temp_column[1]) ^
+                        gf_multiply(0x03, temp_column[2]) ^
+                        temp_column[3];
+
+        new_column[2] = temp_column[0] ^
+                        temp_column[1] ^
+                        gf_multiply(0x02, temp_column[2]) ^
+                        gf_multiply(0x03, temp_column[3]);
+
+        new_column[3] = gf_multiply(0x03, temp_column[0]) ^
+                        temp_column[1] ^
+                        temp_column[2] ^
+                        gf_multiply(0x02, temp_column[3]);
+
+        // Copy new column back to state
+        for (int row = 0; row < 4; row++) {
+            state[row * 4 + column] = new_column[row];
+        }
     }
 }
 void key_derivation(size_t key_len) {
@@ -199,49 +200,89 @@ void add_key() {
 int main(void) {
     char output_file[30];
     char output_path[300];
+    char action[15];
 
     search_file();
+    //reformat this to do to be able to ecnrypt of decrypt
+    printf("Type E if you want to encrypt and D to decrypt");
+    fgets(action, sizeof(action), stdin);
 
-    printf("What is the key you would like to use: \n");
-    fgets(key,sizeof(key),stdin);
-    key[strcspn(key, "\n")] = 0;
-    printf("%s\n",key);
-    size_t key_len = strlen(key);
+    if (action[0] == 'E' || action[0] == 'e') {
 
-    printf("*** make it a .enc *** \n");
-    printf("What is the name of the exported file: \n");
-    fgets(output_file,sizeof(output_file),stdin);
-    output_file[strcspn(output_file, "\n")] = 0;
-    sprintf(output_path,"%s/%s",dir_name,output_file);
+        printf("What is the key you would like to use: \n");
+        fgets(key,sizeof(key),stdin);
+        key[strcspn(key, "\n")] = 0;
+        printf("%s\n",key);
+        size_t key_len = strlen(key);
 
+        printf("*** make it a .enc *** \n");
+        printf("What is the name of the exported file: \n");
+        fgets(output_file,sizeof(output_file),stdin);
+        output_file[strcspn(output_file, "\n")] = 0;
+        sprintf(output_path,"%s/%s",dir_name,output_file);
 
-
-    key_derivation(key_len);
-    add_key();
-
-    for (round = 1; round < 14; round++) {
-        xor(txt_data,file_size);
-        sbox_swap(file_size);
-        shift_row();
-        mix_column(txt_data,file_size);
+        key_derivation(key_len);
         add_key();
-    }
 
-    if (round == 14) {
-        xor(txt_data,file_size);
-        sbox_swap(file_size);
-        shift_row();
-        add_key();
-    }
+        for (round = 1; round < 14; round++) {
+            xor(txt_data,file_size);
+            sbox_swap(file_size);
+            shift_row();
+            mix_column(txt_data);
+            add_key();
+        }
 
-    output = fopen(output_path,"a");
+        if (round == 14) {
+            xor(txt_data,file_size);
+            sbox_swap(file_size);
+            shift_row();
+            add_key();
+        }
 
-    fwrite(txt_data,1,sizeof(txt_data)-1,output);
-    if (output == NULL) {
+        output = fopen(output_path,"wb");
+
+         fwrite(txt_data,1,sizeof(txt_data)-1,output);
+        if (output == NULL) {
         printf("Error opening output file\n");
-    }
+        }
 
-    fclose(output);
-    printf("File successfully encrypted \n");
+        fclose(output);
+        printf("File successfully encrypted \n");
+    } else if (action[0] == 'D' || action[0] == 'd') {
+        //way to get the key back into it or how to save it so it can be used on decrypt
+        printf("What is the name of the exported file: \n");
+        fgets(output_file,sizeof(output_file),stdin);
+        output_file[strcspn(output_file, "\n")] = 0;
+        sprintf(output_path,"%s/%s",dir_name,output_file);
+
+        if (round_reverse == 14) {
+            add_key(); //feel like i might have to amke inverse version
+            shift_row();
+            sbox_swap(file_size);
+            xor(txt_data,file_size);
+        }
+        for (round_reverse = 13; round_reverse > 0; round_reverse--) {
+            add_key(); //feel like i might have to make an inverse version
+            shift_row();
+            mix_column(txt_data);
+            sbox_swap(file_size);     //should this not be like done diff ill look into it
+            xor(txt_data,file_size);
+        }
+        add_key();
+
+        //round_key part again ??
+        //work on decrypt algorithm it is the same in reverse
+
+        output = fopen(output_path,"r");
+
+        fwrite(txt_data,1,sizeof(txt_data)-1,output);
+        if (output == NULL) {
+            printf("Error opening output file\n");
+        }
+        printf("File successfully decrypted \n");
+
+    }else {
+        printf("Invalid input\n");
+    }
     return 0;
 }
